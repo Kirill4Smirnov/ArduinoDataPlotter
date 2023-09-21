@@ -16,7 +16,9 @@ from matplotlib.backends.backend_tkagg import (
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
+        self.trans = ArduinoTransceiver()
 
+        self.variable = tk.StringVar(self)
         self.title('Tkinter Matplotlib Demo')
 
         data = {
@@ -54,19 +56,29 @@ class App(tk.Tk):
         figure_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
     def display_buttons(self):
+        self.variable = tk.StringVar(self)
+        self.variable.set(None)  # default value
+
+        ports = self.trans.list_available_serial_ports()
+
+        w = tk.OptionMenu(self, self.variable, ports)
+        w.pack()
+
         button_frame = tk.Frame(self)
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
 
         btn1 = tk.Button(
             button_frame,
-            text="Button 1"
+            text="Establish a connection",
+            command=self.establish_connection
         )
         btn1.grid(row=0, column=0, sticky=tk.W + tk.E)
 
         btn2 = tk.Button(
             button_frame,
-            text="Button 2"
+            text="Print variable",
+            command=self.print_variable
         )
         btn2.grid(row=0, column=1, sticky=tk.W + tk.E)
         button_frame.pack(fill=tk.X)
@@ -78,17 +90,23 @@ class App(tk.Tk):
         )
         btn3.pack()
 
+    def print_variable(self):
+        print(self.variable.get())
+
+
+    def establish_connection(self):
+        if self.variable.get() != None:
+            self.trans.connect(self.variable.get())
+
     def start_plotting(self):
         pass
 
 
 class ArduinoTransceiver:
-    def __init__(self):
-        print(self.list_available_serial_ports())
-
     def connect(self, port):
         try:
             self.realport = serial.Serial(port=port)
+            print(f"Real port name is: {self.realport}")
         except Exception as e:
             print(e)
 
@@ -121,14 +139,8 @@ class ArduinoTransceiver:
                 pass
         return result
 
-class Controller:
-    @staticmethod
-    def start_app():
-        trans = ArduinoTransceiver()
-
-        app = App()
-        app.mainloop()
-
 
 if __name__ == '__main__':
-    Controller.start_app()
+
+    app = App()
+    app.mainloop()
