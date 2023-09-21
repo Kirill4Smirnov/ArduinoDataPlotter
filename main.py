@@ -82,9 +82,15 @@ class App(tk.Tk):
         pass
 
 
-class ArduinoTransceiver():
+class ArduinoTransceiver:
     def __init__(self):
         print(self.list_available_serial_ports())
+
+    def connect(self, port):
+        try:
+            self.realport = serial.Serial(port=port)
+        except Exception as e:
+            print(e)
 
     @staticmethod
     def list_available_serial_ports():
@@ -115,9 +121,14 @@ class ArduinoTransceiver():
                 pass
         return result
 
+class Controller:
+    @staticmethod
+    def start_app():
+        trans = ArduinoTransceiver()
+
+        app = App()
+        app.mainloop()
+
 
 if __name__ == '__main__':
-    trans = ArduinoTransceiver()
-
-    app = App()
-    app.mainloop()
+    Controller.start_app()
