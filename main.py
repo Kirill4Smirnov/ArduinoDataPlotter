@@ -1,4 +1,5 @@
 import glob
+import re
 import sys
 import tkinter as tk
 import matplotlib.pyplot
@@ -30,11 +31,11 @@ class App(tk.Tk):
 
     def display_buttons(self):
         self.variable = tk.StringVar(self)
-        self.variable.set("None")  # default value
+        self.variable.set(None)  # default value
 
         ports = self.trans.list_available_serial_ports()
 
-        w = tk.OptionMenu(self, self.variable, "None", *ports)
+        w = tk.OptionMenu(self, self.variable, None, *ports)
         w.pack()
 
         button_frame = tk.Frame(self)
@@ -82,46 +83,48 @@ class App(tk.Tk):
         matplotlib.pyplot.show()
 
     def print_variable(self):
-        print(self.trans.read_quick())
+        print(self.trans.read())
 
     def update_plot(self, i):
         # data = {1: 2, 2: 2, 3: 3, 4: 5}
         # self.axes.plot(data.keys(), data.values())
 
-        data = self.trans.read_stub()
-        x =
-        y = np.sin(2 * (x - 0.1 * i))
-
-        self.axes.cla()
-        self.axes.plot(x, y)
-
-        return self.axes
+        pass
 
     def establish_connection(self):
         if self.variable.get() != None:
             self.trans.connect(self.variable.get())
+        else:
+            print("Your chosen port is None, please chose another")
 
     def start_plotting(self):
         pass
 
 
 class ArduinoTransceiver:
+    def __init__(self):
+        self.i = 0
+        self.data = np.array([])
+
     def connect(self, port):
         try:
             self.realport = serial.Serial(port=port)
             print(f"Real port name is: {self.realport}")
             self.line_reader = ReadLine(self.realport)
-            self.i = 0
+
         except Exception as e:
             print(e)
 
     def read(self):
         buffer_size = self.realport.in_waiting
-        val = self.realport.read(buffer_size)
-        raw_list = val.split(b"\n\r")
-        list = list(map(float, raw_list))
+        val = self.realport.read(buffer_size).decode()
+        raw_list = np.array(re.split(r'\r\n|\n\r', val))
+        raw_list.
+        print(raw_list)
+        float_list = raw_list.astype(float)
 
-        return list
+
+        return float_list
 
     def read_quick(self):
         return self.line_reader.readline()
