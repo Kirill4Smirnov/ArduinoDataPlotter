@@ -42,54 +42,65 @@ class App(tk.Tk):
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
 
-        btn1 = tk.Button(
+        connect_btn = tk.Button(
             button_frame,
             text="Establish a connection",
             command=self.establish_connection
         )
-        btn1.grid(row=0, column=0, sticky=tk.W + tk.E)
+        connect_btn.grid(row=0, column=0, sticky=tk.W + tk.E)
 
-        btn2 = tk.Button(
+        read_btn = tk.Button(
             button_frame,
             text="Read and print buffer",
             command=self.print_variable
         )
-        btn2.grid(row=0, column=1, sticky=tk.W + tk.E)
-        button_frame.pack(fill=tk.X)
+        read_btn.grid(row=0, column=1, sticky=tk.W + tk.E)
 
-        btn3 = tk.Button(
+        quit_btn = tk.Button(
+            button_frame,
             text="Quit",
             width=10,
             command=self.destroy
         )
-        btn3.pack()
+        quit_btn.grid(row=1, column=1, sticky=tk.W+tk.E)
+
+        start_plot_btn = tk.Button(
+            button_frame,
+            text="Update plot",
+            command=self.update_plot
+        )
+        start_plot_btn.grid(row=1, column=0, sticky=tk.W + tk.E)
+
+        button_frame.pack(fill=tk.X)
+
 
     def display_plot(self):
-        figure = Figure(figsize=(6, 4), dpi=100)
-        figure_canvas = FigureCanvasTkAgg(figure, self)
-        NavigationToolbar2Tk(figure_canvas, self)
-        self.axes = figure.add_subplot()
+        self.figure = Figure(figsize=(6, 4), dpi=100)
+        self.figure_canvas = FigureCanvasTkAgg(self.figure, self)
+        NavigationToolbar2Tk(self.figure_canvas, self)
+        self.axes = self.figure.add_subplot()
 
-        # self.axes.plot(data.keys(), data.values())
+        self.plot,  = self.axes.plot([1, 2, 3, 4, 7], [-1, 3, -2, 1, 0])
 
-        figure_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-
-        anim = FuncAnimation(figure,
-                             self.update_plot,
-                             frames=20,
-                             interval=50)
-
-        anim.save(r'animation.gif', fps=10)
+        self.figure_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
         matplotlib.pyplot.show()
 
     def print_variable(self):
         print(self.trans.read())
 
-    def update_plot(self, i):
-        # data = {1: 2, 2: 2, 3: 3, 4: 5}
-        # self.axes.plot(data.keys(), data.values())
+    def update_plot(self):
+        data = self.trans.read()
+        print(f"data = {data}, data.size = {data.size}")
+        #self.axes.plot(np.arange(data.size), data)
+        #self.axes.plot([1, 2, 3, 4, 11], [-1, 3, -2, 1, 0])
+        self.plot.set_xdata(np.arange(data.size))
+        self.plot.set_ydata(data)
 
-        pass
+        self.axes.set_xlim([0, data.size])
+
+        self.figure_canvas.draw()
+        #self.figure_canvas.flush_events()
+        #matplotlib.pyplot.show()
 
     def establish_connection(self):
         if self.variable.get() != None:
@@ -174,7 +185,7 @@ class ReadLine:
             return r
         while True:
             i = max(1, min(2048, self.s.in_waiting))
-            data = self.s.read(i)
+            data = self.s. read(i)
             i = data.find(b"\n")
             if i >= 0:
                 r = self.buf + data[:i + 1]
