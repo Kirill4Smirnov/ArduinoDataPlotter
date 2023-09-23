@@ -119,12 +119,11 @@ class ArduinoTransceiver:
         buffer_size = self.realport.in_waiting
         val = self.realport.read(buffer_size).decode()
         raw_list = np.array(re.split(r'\r\n|\n\r', val))
-        raw_list.
-        print(raw_list)
+        raw_list = np.delete(raw_list, -1) # the last element always contains an artefact due to the line cutting off, so we need to remove it
         float_list = raw_list.astype(float)
 
-
-        return float_list
+        self.data = np.append(self.data, float_list)
+        return self.data.copy()
 
     def read_quick(self):
         return self.line_reader.readline()
