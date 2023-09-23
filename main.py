@@ -1,8 +1,12 @@
 import glob
 import sys
 import tkinter as tk
-import matplotlib
+import matplotlib.pyplot
 import serial
+import threading
+import time
+import numpy as np
+from matplotlib.animation import FuncAnimation
 
 matplotlib.use('TkAgg')
 
@@ -19,49 +23,18 @@ class App(tk.Tk):
         self.trans = ArduinoTransceiver()
 
         self.variable = tk.StringVar(self)
-        self.title('Tkinter Matplotlib Demo')
+        self.title('Chromatograph plotter')
 
-        data = {
-            'Python': 11.27,
-            'C': 11.16,
-            'Java': 10.46,
-            'C++': 7.5,
-            'C#': 5.26
-        }
-
-        self.display_plot(data)
+        self.display_plot()
         self.display_buttons()
-
-    def display_plot(self, data):
-        languages = data.keys()
-        popularity = data.values()
-
-        # create a figure
-        figure = Figure(figsize=(6, 4), dpi=100)
-
-        # create FigureCanvasTkAgg object
-        figure_canvas = FigureCanvasTkAgg(figure, self)
-
-        # create the toolbar
-        NavigationToolbar2Tk(figure_canvas, self)
-
-        # create axes
-        axes = figure.add_subplot()
-
-        # create the barchart
-        axes.bar(languages, popularity)
-        axes.set_title('Top 5 Programming Languages')
-        axes.set_ylabel('Popularity')
-
-        figure_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
     def display_buttons(self):
         self.variable = tk.StringVar(self)
-        self.variable.set(None)  # default value
+        self.variable.set("None")  # default value
 
         ports = self.trans.list_available_serial_ports()
 
-        w = tk.OptionMenu(self, self.variable, ports)
+        w = tk.OptionMenu(self, self.variable, "None", *ports)
         w.pack()
 
         button_frame = tk.Frame(self)
@@ -77,7 +50,7 @@ class App(tk.Tk):
 
         btn2 = tk.Button(
             button_frame,
-            text="Print variable",
+            text="Read and print buffer",
             command=self.print_variable
         )
         btn2.grid(row=0, column=1, sticky=tk.W + tk.E)
@@ -90,9 +63,39 @@ class App(tk.Tk):
         )
         btn3.pack()
 
-    def print_variable(self):
-        print(self.variable.get())
+    def display_plot(self):
+        figure = Figure(figsize=(6, 4), dpi=100)
+        figure_canvas = FigureCanvasTkAgg(figure, self)
+        NavigationToolbar2Tk(figure_canvas, self)
+        self.axes = figure.add_subplot()
 
+        # self.axes.plot(data.keys(), data.values())
+
+        figure_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+        anim = FuncAnimation(figure,
+                             self.update_plot,
+                             frames=20,
+                             interval=50)
+
+        anim.save(r'animation.gif', fps=10)
+        matplotlib.pyplot.show()
+
+    def print_variable(self):
+        print(self.trans.read_quick())
+
+    def update_plot(self, i):
+        # data = {1: 2, 2: 2, 3: 3, 4: 5}
+        # self.axes.plot(data.keys(), data.values())
+
+        data = self.trans.read_stub()
+        x =
+        y = np.sin(2 * (x - 0.1 * i))
+
+        self.axes.cla()
+        self.axes.plot(x, y)
+
+        return self.axes
 
     def establish_connection(self):
         if self.variable.get() != None:
@@ -107,8 +110,24 @@ class ArduinoTransceiver:
         try:
             self.realport = serial.Serial(port=port)
             print(f"Real port name is: {self.realport}")
+            self.line_reader = ReadLine(self.realport)
+            self.i = 0
         except Exception as e:
             print(e)
+
+    def read(self):
+        buffer_size = self.realport.in_waiting
+        val = self.realport.read(buffer_size)
+        raw_list = val.split(b"\n\r")
+        list = list(map(float, raw_list))
+
+        return list
+
+    def read_quick(self):
+        return self.line_reader.readline()
+
+    def read_stub(self):
+        pass
 
     @staticmethod
     def list_available_serial_ports():
@@ -140,7 +159,29 @@ class ArduinoTransceiver:
         return result
 
 
-if __name__ == '__main__':
+class ReadLine:
+    def __init__(self, s):
+        self.buf = bytearray()
+        self.s = s
 
+    def readline(self):
+        i = self.buf.find(b"\n")
+        if i >= 0:
+            r = self.buf[:i + 1]
+            self.buf = self.buf[i + 1:]
+            return r
+        while True:
+            i = max(1, min(2048, self.s.in_waiting))
+            data = self.s.read(i)
+            i = data.find(b"\n")
+            if i >= 0:
+                r = self.buf + data[:i + 1]
+                self.buf[0:] = data[i + 1:]
+                return r
+            else:
+                self.buf.extend(data)
+
+
+if __name__ == '__main__':
     app = App()
     app.mainloop()
