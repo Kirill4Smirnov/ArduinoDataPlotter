@@ -21,6 +21,7 @@ from matplotlib.backends.backend_tkagg import (
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
+        self.plotting = False
         self.trans = ArduinoTransceiver()
 
         self.variable = tk.StringVar(self)
@@ -56,18 +57,18 @@ class App(tk.Tk):
         )
         read_btn.grid(row=0, column=1, sticky=tk.W + tk.E)
 
-        quit_btn = tk.Button(
+        stop_plot_btn = tk.Button(
             button_frame,
-            text="Quit",
+            text="Stop plotting",
             width=10,
-            command=self.destroy
+            command=self.stop_update_plot
         )
-        quit_btn.grid(row=1, column=1, sticky=tk.W+tk.E)
+        stop_plot_btn.grid(row=1, column=1, sticky=tk.W+tk.E)
 
         start_plot_btn = tk.Button(
             button_frame,
-            text="Update plot",
-            command=self.update_plot
+            text="Start plotting",
+            command=self.start_update_plot
         )
         start_plot_btn.grid(row=1, column=0, sticky=tk.W + tk.E)
 
@@ -88,19 +89,27 @@ class App(tk.Tk):
     def print_variable(self):
         print(self.trans.read())
 
-    def update_plot(self):
-        data = self.trans.read()
-        print(f"data = {data}, data.size = {data.size}")
-        #self.axes.plot(np.arange(data.size), data)
-        #self.axes.plot([1, 2, 3, 4, 11], [-1, 3, -2, 1, 0])
-        self.plot.set_xdata(np.arange(data.size))
-        self.plot.set_ydata(data)
+    def start_update_plot(self):
+        self.plotting = True
+        while self.plotting == True:
+            data = self.trans.read()
+            #self.axes.plot(np.arange(data.size), data)
+            #self.axes.plot([1, 2, 3, 4, 11], [-1, 3, -2, 1, 0])
+            print(data)
+            self.plot.set_ydata(data)
+            self.plot.set_xdata(np.arange(data.size))
 
-        self.axes.set_xlim([0, data.size])
+            self.axes.set_xlim([0, data.size])
+            self.axes.set_ylim([0, None])
 
-        self.figure_canvas.draw()
-        #self.figure_canvas.flush_events()
-        #matplotlib.pyplot.show()
+            self.figure_canvas.draw()
+            self.figure_canvas.flush_events()
+            #matplotlib.pyplot.show()
+            time.sleep(0.05)
+
+    def stop_update_plot(self) -> None:
+        self.plotting = False
+
 
     def establish_connection(self):
         if self.variable.get() != None:
@@ -109,7 +118,8 @@ class App(tk.Tk):
             print("Your chosen port is None, please chose another")
 
     def start_plotting(self):
-        pass
+        update_thread = threading.Thread(target=self.start_update_plot())
+
 
 
 class ArduinoTransceiver:
