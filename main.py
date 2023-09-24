@@ -29,7 +29,7 @@ class App(tk.Tk):
         self.display_plot()
         self.display_buttons()
 
-    def display_buttons(self):
+    def display_buttons(self) -> None:
         self.variable = tk.StringVar(self)
         self.variable.set('None')  # default value
 
@@ -38,6 +38,7 @@ class App(tk.Tk):
         port_frame = tk.Frame(self)
         port_frame.columnconfigure(0, weight=1)
         port_frame.columnconfigure(1, weight=1)
+        port_frame.columnconfigure(2, weight=1)
 
         port_option_menu = tk.OptionMenu(port_frame, self.variable, 'None', *ports)
         port_option_menu.grid(row=0, column=0)
@@ -48,6 +49,14 @@ class App(tk.Tk):
             command=self.establish_connection
         )
         connect_btn.grid(row=0, column=1)
+
+        read_btn = tk.Button(
+            port_frame,
+            text="Read and print buffer",
+            command=self.print_variable
+        )
+        read_btn.grid(row=0, column=2)
+
         port_frame.pack()
 
         button_frame = tk.Frame(self)
@@ -55,27 +64,26 @@ class App(tk.Tk):
         button_frame.columnconfigure(1, weight=1)
 
 
-
-        read_btn = tk.Button(
-            button_frame,
-            text="Read and print buffer",
-            command=self.print_variable
-        )
-        read_btn.grid(row=0, column=1, sticky=tk.W + tk.E)
-
         stop_plot_btn = tk.Button(
             button_frame,
             text="Stop plotting",
             command=self.stop_update_plot
         )
-        stop_plot_btn.grid(row=1, column=1, sticky=tk.W + tk.E)
+        stop_plot_btn.grid(row=0, column=1, sticky=tk.W + tk.E)
 
         start_plot_btn = tk.Button(
             button_frame,
             text="Start plotting",
             command=self.start_plotting
         )
-        start_plot_btn.grid(row=1, column=0, sticky=tk.W + tk.E)
+        start_plot_btn.grid(row=0, column=0, sticky=tk.W + tk.E)
+
+        clear_plot_btn = tk.Button(
+            button_frame,
+            text="Clear data",
+            command=self.clear_data
+        )
+        clear_plot_btn.grid(row=1, column=0, sticky=tk.W + tk.E)
 
         button_frame.pack(fill=tk.X)
 
@@ -85,7 +93,7 @@ class App(tk.Tk):
         )
         quit_btn.pack()
 
-    def display_plot(self):
+    def display_plot(self) -> None:
         self.figure = Figure(figsize=(10, 4), dpi=100)
         self.figure_canvas = FigureCanvasTkAgg(self.figure, self)
         NavigationToolbar2Tk(self.figure_canvas, self)
@@ -96,14 +104,14 @@ class App(tk.Tk):
         self.figure_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
         matplotlib.pyplot.show()
 
-    def print_variable(self):
+    def print_variable(self) -> None:
         if self.trans.realport is None:
             print("Connection is not set up")
             return
 
         print(self.trans.read_str_by_str())
 
-    def start_update_plot(self):
+    def start_update_plot(self) -> None:
         if self.trans.realport is None:
             print("Connection is not set up")
             return
@@ -126,11 +134,13 @@ class App(tk.Tk):
     def stop_update_plot(self) -> None:
         self.plotting = False
 
-    def destroy_and_end_plotting(self):
+    def destroy_and_end_plotting(self) -> None:
         self.plotting = False
+        if self.trans.realport is not None:
+            self.trans.realport.close()
         self.destroy()
 
-    def establish_connection(self):
+    def establish_connection(self) -> None:
         if self.variable.get() != 'None':
             self.trans.connect(self.variable.get())
 
@@ -139,15 +149,18 @@ class App(tk.Tk):
         else:
             print("Your chosen port is None, please chose another")
 
-    def start_plotting(self):
+    def start_plotting(self) -> None:
         update_thread = threading.Thread(target=self.start_update_plot())
         update_thread.start()
+
+    def clear_data(self) -> None:
+        self.trans.data = np.array([])
 
 
 class ArduinoTransceiver:
     def __init__(self):
         self.i = 0
-        self.__data = np.array([])
+        self.data = np.array([])
         self.realport = None
 
     def connect(self, port):
@@ -168,8 +181,8 @@ class ArduinoTransceiver:
         raw_list = raw_list[raw_list != '']
         float_list = raw_list.astype(float)
 
-        self.__data = np.append(self.__data, float_list)
-        return self.__data.copy()
+        self.data = np.append(self.data, float_list)
+        return self.data.copy()
 
     def read_str_by_str(self):
         while self.realport.in_waiting > 10:
@@ -181,22 +194,25 @@ class ArduinoTransceiver:
                 if len(raw_list) > 0:
                     for i in range(len(raw_list)):
                         if len(raw_list[i]) > 4:
-                            np.delete(raw_list, i)
+                            raw_list = np.delete(raw_list, i)
                     float_list = raw_list.astype(float)
 
-                    self.__data = np.append(self.__data, float_list)
+                    self.data = np.append(self.data, float_list)
             except(UnicodeDecodeError) as e:
+                print(e)
                 buffer_size = self.realport.in_waiting
                 self.realport.read(buffer_size)
-                print(e)
+                #self.realport.flush()
+                continue
 
-        return self.__data.copy()
+
+        return self.data.copy()
 
     def clear_input(self):
         buffer_size = self.realport.in_waiting
         self.realport.read(buffer_size)
 
-        self.__data = np.array([])
+        self.data = np.array([])
 
     @staticmethod
     def list_available_serial_ports():
