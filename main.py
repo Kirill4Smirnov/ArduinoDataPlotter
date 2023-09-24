@@ -7,7 +7,6 @@ import serial
 import threading
 import time
 import numpy as np
-from matplotlib.animation import FuncAnimation
 
 matplotlib.use('TkAgg')
 
@@ -63,7 +62,7 @@ class App(tk.Tk):
             width=10,
             command=self.stop_update_plot
         )
-        stop_plot_btn.grid(row=1, column=1, sticky=tk.W+tk.E)
+        stop_plot_btn.grid(row=1, column=1, sticky=tk.W + tk.E)
 
         start_plot_btn = tk.Button(
             button_frame,
@@ -87,19 +86,19 @@ class App(tk.Tk):
         NavigationToolbar2Tk(self.figure_canvas, self)
         self.axes = self.figure.add_subplot()
 
-        self.plot,  = self.axes.plot([1, 2, 3, 4, 7], [-1, 3, -2, 1, 0])
+        self.plot, = self.axes.plot([1, 2, 3, 4, 7], [-1, 3, -2, 1, 0])
 
         self.figure_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
         matplotlib.pyplot.show()
 
     def print_variable(self):
-        print(self.trans.read())
+        print(self.trans.read_quick())
 
     def start_update_plot(self):
         self.plotting = True
         while self.plotting == True:
             data = self.trans.read()
-            #print(data)
+            # print(data)
             self.plot.set_ydata(data)
             self.plot.set_xdata(np.arange(data.size))
 
@@ -108,7 +107,7 @@ class App(tk.Tk):
 
             self.figure_canvas.draw()
             self.figure_canvas.flush_events()
-            #matplotlib.pyplot.show()
+            # matplotlib.pyplot.show()
             time.sleep(0.05)
 
     def stop_update_plot(self) -> None:
@@ -129,7 +128,6 @@ class App(tk.Tk):
         update_thread.start()
 
 
-
 class ArduinoTransceiver:
     def __init__(self):
         self.i = 0
@@ -148,7 +146,8 @@ class ArduinoTransceiver:
         buffer_size = self.realport.in_waiting
         val = self.realport.read(buffer_size).decode()
         raw_list = np.array(re.split(r'\r\n|\n\r', val))
-        raw_list = np.delete(raw_list, -1) # the last element always contains an artefact due to the line cutting off, so we need to remove it
+        raw_list = np.delete(raw_list,
+                             -1)  # the last element always contains an artefact due to the line cutting off, so we need to remove it
         raw_list = raw_list[raw_list != '']
         float_list = raw_list.astype(float)
 
@@ -156,7 +155,21 @@ class ArduinoTransceiver:
         return self.data.copy()
 
     def read_quick(self):
-        return self.line_reader.readline()
+        # return self.line_reader.readline()
+
+        while self.realport.in_waiting > 10:
+            val = self.line_reader.readline().decode()
+            raw_list = np.array(re.split(r'\r\n|\n\r', val))
+            raw_list = raw_list[raw_list != '']
+            #raw_list = np.delete(raw_list,
+            #                     -1)  # the last element always contains an artefact due to the line cutting off, so we need to remove it
+            #raw_list = raw_list[raw_list != '']
+            float_list = raw_list.astype(float)
+
+            self.data = np.append(self.data, float_list)
+
+        return self.data.copy()
+
 
     def read_stub(self):
         pass
@@ -204,7 +217,7 @@ class ReadLine:
             return r
         while True:
             i = max(1, min(2048, self.s.in_waiting))
-            data = self.s. read(i)
+            data = self.s.read(i)
             i = data.find(b"\n")
             if i >= 0:
                 r = self.buf + data[:i + 1]
