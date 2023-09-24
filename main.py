@@ -68,15 +68,21 @@ class App(tk.Tk):
         start_plot_btn = tk.Button(
             button_frame,
             text="Start plotting",
-            command=self.start_update_plot
+            command=self.start_plotting
         )
         start_plot_btn.grid(row=1, column=0, sticky=tk.W + tk.E)
 
         button_frame.pack(fill=tk.X)
 
+        quit_btn = tk.Button(
+            text="Quit",
+            width=10,
+            command=self.destroy_and_end_plotting
+        )
+        quit_btn.pack()
 
     def display_plot(self):
-        self.figure = Figure(figsize=(6, 4), dpi=100)
+        self.figure = Figure(figsize=(10, 4), dpi=100)
         self.figure_canvas = FigureCanvasTkAgg(self.figure, self)
         NavigationToolbar2Tk(self.figure_canvas, self)
         self.axes = self.figure.add_subplot()
@@ -93,9 +99,7 @@ class App(tk.Tk):
         self.plotting = True
         while self.plotting == True:
             data = self.trans.read()
-            #self.axes.plot(np.arange(data.size), data)
-            #self.axes.plot([1, 2, 3, 4, 11], [-1, 3, -2, 1, 0])
-            print(data)
+            #print(data)
             self.plot.set_ydata(data)
             self.plot.set_xdata(np.arange(data.size))
 
@@ -110,6 +114,9 @@ class App(tk.Tk):
     def stop_update_plot(self) -> None:
         self.plotting = False
 
+    def destroy_and_end_plotting(self):
+        self.plotting = False
+        self.destroy()
 
     def establish_connection(self):
         if self.variable.get() != None:
@@ -119,6 +126,7 @@ class App(tk.Tk):
 
     def start_plotting(self):
         update_thread = threading.Thread(target=self.start_update_plot())
+        update_thread.start()
 
 
 
@@ -141,6 +149,7 @@ class ArduinoTransceiver:
         val = self.realport.read(buffer_size).decode()
         raw_list = np.array(re.split(r'\r\n|\n\r', val))
         raw_list = np.delete(raw_list, -1) # the last element always contains an artefact due to the line cutting off, so we need to remove it
+        raw_list = raw_list[raw_list != '']
         float_list = raw_list.astype(float)
 
         self.data = np.append(self.data, float_list)
