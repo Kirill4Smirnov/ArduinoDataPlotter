@@ -31,23 +31,30 @@ class App(tk.Tk):
 
     def display_buttons(self):
         self.variable = tk.StringVar(self)
-        self.variable.set(None)  # default value
+        self.variable.set('None')  # default value
 
         ports = self.trans.list_available_serial_ports()
 
-        w = tk.OptionMenu(self, self.variable, None, *ports)
-        w.pack()
+        port_frame = tk.Frame(self)
+        port_frame.columnconfigure(0, weight=1)
+        port_frame.columnconfigure(1, weight=1)
+
+        port_option_menu = tk.OptionMenu(port_frame, self.variable, 'None', *ports)
+        port_option_menu.grid(row=0, column=0)
+
+        connect_btn = tk.Button(
+            port_frame,
+            text="Establish a connection",
+            command=self.establish_connection
+        )
+        connect_btn.grid(row=0, column=1)
+        port_frame.pack()
 
         button_frame = tk.Frame(self)
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
 
-        connect_btn = tk.Button(
-            button_frame,
-            text="Establish a connection",
-            command=self.establish_connection
-        )
-        connect_btn.grid(row=0, column=0, sticky=tk.W + tk.E)
+
 
         read_btn = tk.Button(
             button_frame,
@@ -59,7 +66,6 @@ class App(tk.Tk):
         stop_plot_btn = tk.Button(
             button_frame,
             text="Stop plotting",
-            width=10,
             command=self.stop_update_plot
         )
         stop_plot_btn.grid(row=1, column=1, sticky=tk.W + tk.E)
@@ -75,7 +81,6 @@ class App(tk.Tk):
 
         quit_btn = tk.Button(
             text="Quit",
-            width=10,
             command=self.destroy_and_end_plotting
         )
         quit_btn.pack()
@@ -92,12 +97,20 @@ class App(tk.Tk):
         matplotlib.pyplot.show()
 
     def print_variable(self):
-        print(self.trans.read_quick())
+        if self.trans.realport is None:
+            print("Connection is not set up")
+            return
+
+        print(self.trans.read_str_by_str())
 
     def start_update_plot(self):
+        if self.trans.realport is None:
+            print("Connection is not set up")
+            return
+
         self.plotting = True
         while self.plotting == True:
-            data = self.trans.read()
+            data = self.trans.read_str_by_str()
             # print(data)
             self.plot.set_ydata(data)
             self.plot.set_xdata(np.arange(data.size))
@@ -118,8 +131,11 @@ class App(tk.Tk):
         self.destroy()
 
     def establish_connection(self):
-        if self.variable.get() != None:
+        if self.variable.get() != 'None':
             self.trans.connect(self.variable.get())
+
+            if self.trans.realport is not None:
+                self.trans.clear_input() # a few first messages from Arduino often are spoiled
         else:
             print("Your chosen port is None, please chose another")
 
@@ -131,7 +147,8 @@ class App(tk.Tk):
 class ArduinoTransceiver:
     def __init__(self):
         self.i = 0
-        self.data = np.array([])
+        self.__data = np.array([])
+        self.realport = None
 
     def connect(self, port):
         try:
@@ -142,7 +159,7 @@ class ArduinoTransceiver:
         except Exception as e:
             print(e)
 
-    def read(self):
+    def read_all_buffer(self):
         buffer_size = self.realport.in_waiting
         val = self.realport.read(buffer_size).decode()
         raw_list = np.array(re.split(r'\r\n|\n\r', val))
@@ -151,28 +168,35 @@ class ArduinoTransceiver:
         raw_list = raw_list[raw_list != '']
         float_list = raw_list.astype(float)
 
-        self.data = np.append(self.data, float_list)
-        return self.data.copy()
+        self.__data = np.append(self.__data, float_list)
+        return self.__data.copy()
 
-    def read_quick(self):
-        # return self.line_reader.readline()
-
+    def read_str_by_str(self):
         while self.realport.in_waiting > 10:
-            val = self.line_reader.readline().decode()
-            raw_list = np.array(re.split(r'\r\n|\n\r', val))
-            raw_list = raw_list[raw_list != '']
-            #raw_list = np.delete(raw_list,
-            #                     -1)  # the last element always contains an artefact due to the line cutting off, so we need to remove it
-            #raw_list = raw_list[raw_list != '']
-            float_list = raw_list.astype(float)
+            try:
+                val = self.line_reader.readline().decode()
+                raw_list = np.array(re.split(r'\r\n|\n\r', val))
+                raw_list = raw_list[raw_list != '']
 
-            self.data = np.append(self.data, float_list)
+                if len(raw_list) > 0:
+                    for i in range(len(raw_list)):
+                        if len(raw_list[i]) > 4:
+                            np.delete(raw_list, i)
+                    float_list = raw_list.astype(float)
 
-        return self.data.copy()
+                    self.__data = np.append(self.__data, float_list)
+            except(UnicodeDecodeError) as e:
+                buffer_size = self.realport.in_waiting
+                self.realport.read(buffer_size)
+                print(e)
 
+        return self.__data.copy()
 
-    def read_stub(self):
-        pass
+    def clear_input(self):
+        buffer_size = self.realport.in_waiting
+        self.realport.read(buffer_size)
+
+        self.__data = np.array([])
 
     @staticmethod
     def list_available_serial_ports():
