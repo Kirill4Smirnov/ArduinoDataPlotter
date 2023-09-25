@@ -57,6 +57,7 @@ class App(tk.Tk):
         )
         read_btn.grid(row=0, column=2)
 
+
         port_frame.pack()
 
         button_frame = tk.Frame(self)
@@ -84,6 +85,7 @@ class App(tk.Tk):
             command=self.clear_data
         )
         clear_plot_btn.grid(row=1, column=0, sticky=tk.W + tk.E)
+        #clear_plot_btn['state'] = tk.DISABLED
 
         button_frame.pack(fill=tk.X)
 
@@ -124,7 +126,7 @@ class App(tk.Tk):
             self.plot.set_xdata(np.arange(data.size))
 
             self.axes.set_xlim([0, data.size])
-            self.axes.set_ylim([0, None])
+            self.axes.set_ylim([0, np.max(data)])
 
             self.figure_canvas.draw()
             self.figure_canvas.flush_events()
@@ -155,7 +157,10 @@ class App(tk.Tk):
 
     def clear_data(self) -> None:
         self.trans.data = np.array([])
+        self.trans.clear_input()
 
+    def enable_buttons(self):
+        pass
 
 class ArduinoTransceiver:
     def __init__(self):
@@ -190,19 +195,23 @@ class ArduinoTransceiver:
                 val = self.line_reader.readline().decode()
                 raw_list = np.array(re.split(r'\r\n|\n\r', val))
                 raw_list = raw_list[raw_list != '']
-
+                print(raw_list)
                 if len(raw_list) > 0:
                     for i in range(len(raw_list)):
-                        if len(raw_list[i]) > 4:
-                            raw_list = np.delete(raw_list, i)
+                        char_count = 0
+                        for char in raw_list[i]:
+                            if char == '.':
+                                char_count += 1
+                        if char_count >= 2:
+                            raw_list = np.delete[raw_list, i]
                     float_list = raw_list.astype(float)
 
                     self.data = np.append(self.data, float_list)
             except(UnicodeDecodeError) as e:
                 print(e)
-                buffer_size = self.realport.in_waiting
-                self.realport.read(buffer_size)
-                #self.realport.flush()
+                #buffer_size = self.realport.in_waiting
+                #self.realport.read(buffer_size)
+                self.realport.flush()
                 continue
 
 
