@@ -50,13 +50,13 @@ class App(tk.Tk):
         )
         connect_btn.grid(row=0, column=1)
 
-        read_btn = tk.Button(
+        self.read_btn = tk.Button(
             port_frame,
             text="Read and print buffer",
-            command=self.print_variable
+            command=self.print_variable,
+            state=tk.DISABLED
         )
-        read_btn.grid(row=0, column=2)
-
+        self.read_btn.grid(row=0, column=2)
 
         port_frame.pack()
 
@@ -64,28 +64,30 @@ class App(tk.Tk):
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
 
-
-        stop_plot_btn = tk.Button(
+        self.stop_plot_btn = tk.Button(
             button_frame,
             text="Stop plotting",
-            command=self.stop_update_plot
+            command=self.stop_update_plot,
+            state=tk.DISABLED
         )
-        stop_plot_btn.grid(row=0, column=1, sticky=tk.W + tk.E)
+        self.stop_plot_btn.grid(row=0, column=1, sticky=tk.W + tk.E)
 
-        start_plot_btn = tk.Button(
+        self.start_plot_btn = tk.Button(
             button_frame,
             text="Start plotting",
-            command=self.start_plotting
+            command=self.start_plotting,
+            state=tk.DISABLED
         )
-        start_plot_btn.grid(row=0, column=0, sticky=tk.W + tk.E)
+        self.start_plot_btn.grid(row=0, column=0, sticky=tk.W + tk.E)
 
-        clear_plot_btn = tk.Button(
+        self.clear_plot_btn = tk.Button(
             button_frame,
             text="Clear data",
-            command=self.clear_data
+            command=self.clear_data,
+            state=tk.DISABLED
         )
-        clear_plot_btn.grid(row=1, column=0, sticky=tk.W + tk.E)
-        #clear_plot_btn['state'] = tk.DISABLED
+        self.clear_plot_btn.grid(row=1, column=0, sticky=tk.W + tk.E)
+        # clear_plot_btn['state'] = tk.DISABLED
 
         button_frame.pack(fill=tk.X)
 
@@ -147,7 +149,8 @@ class App(tk.Tk):
             self.trans.connect(self.variable.get())
 
             if self.trans.realport is not None:
-                self.trans.clear_input() # a few first messages from Arduino often are spoiled
+                self.enable_buttons()
+                self.trans.clear_input()  # a few first messages from Arduino often are spoiled
         else:
             print("Your chosen port is None, please chose another")
 
@@ -160,7 +163,11 @@ class App(tk.Tk):
         self.trans.clear_input()
 
     def enable_buttons(self):
-        pass
+        self.read_btn['state'] = tk.NORMAL
+        self.start_plot_btn['state'] = tk.NORMAL
+        self.stop_plot_btn['state'] = tk.NORMAL
+        self.clear_plot_btn['state'] = tk.NORMAL
+
 
 class ArduinoTransceiver:
     def __init__(self):
@@ -209,11 +216,10 @@ class ArduinoTransceiver:
                     self.data = np.append(self.data, float_list)
             except(UnicodeDecodeError) as e:
                 print(e)
-                #buffer_size = self.realport.in_waiting
-                #self.realport.read(buffer_size)
+                # buffer_size = self.realport.in_waiting
+                # self.realport.read(buffer_size)
                 self.realport.flush()
                 continue
-
 
         return self.data.copy()
 
