@@ -138,7 +138,8 @@ class App(tk.Tk):
             self.plot.set_xdata(np.arange(data.size))
 
             self.axes.set_xlim([0, data.size])
-            self.axes.set_ylim([0, np.max(data)])
+            if np.max(data) != np.inf:
+                self.axes.set_ylim([0, np.max(data)] + 1.0)
 
             self.figure_canvas.draw()
             self.figure_canvas.flush_events()
@@ -236,7 +237,6 @@ class ArduinoTransceiver:
                 val = self.line_reader.readline().decode()
                 raw_list = np.array(re.split(r'\r\n|\n\r', val))
                 raw_list = raw_list[raw_list != '']
-                print(raw_list)
                 if len(raw_list) > 0:
                     for i in range(len(raw_list)):
                         char_count = 0
@@ -244,15 +244,15 @@ class ArduinoTransceiver:
                             if char == '.':
                                 char_count += 1
                         if char_count >= 2:
-                            raw_list = np.delete[raw_list, i]
-                    float_list = raw_list.astype(float)
+                            raw_list = np.delete(raw_list, i, axis=0)
+                        float_list = raw_list.astype(float)
 
-                    self.data = np.append(self.data, float_list)
-            except(UnicodeDecodeError) as e:
+                        self.data = np.append(self.data, float_list)
+            except UnicodeDecodeError as e:
                 print(e)
-                # buffer_size = self.realport.in_waiting
-                # self.realport.read(buffer_size)
-                self.realport.flush()
+                buffer_size = self.realport.in_waiting
+                self.realport.read(buffer_size)
+                # self.realport.flush()
                 continue
 
         return self.data.copy()
