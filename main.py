@@ -21,6 +21,9 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.plotting = False
+        self.recording = False
+        self.record_start = None
+
         self.trans = ArduinoTransceiver()
 
         self.variable = tk.StringVar(self)
@@ -87,7 +90,14 @@ class App(tk.Tk):
             state=tk.DISABLED
         )
         self.clear_plot_btn.grid(row=1, column=0, sticky=tk.W + tk.E)
-        # clear_plot_btn['state'] = tk.DISABLED
+
+        self.start_stop_record_btn = tk.Button(
+            button_frame,
+            text="Start recording",
+            command=self.clear_data,
+            state=tk.DISABLED
+        )
+        self.start_stop_record_btn.grid(row=1, column=1, sticky=tk.W + tk.E)
 
         button_frame.pack(fill=tk.X)
 
@@ -103,7 +113,7 @@ class App(tk.Tk):
         NavigationToolbar2Tk(self.figure_canvas, self)
         self.axes = self.figure.add_subplot()
 
-        self.plot, = self.axes.plot([1, 2, 3, 4, 7], [-1, 3, -2, 1, 0])
+        self.plot, = self.axes.plot([1, 2, 3, 4, 7], [-1, 3, -2, 1, 0], color='blue')
 
         self.figure_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
         matplotlib.pyplot.show()
@@ -159,14 +169,38 @@ class App(tk.Tk):
         update_thread.start()
 
     def clear_data(self) -> None:
-        self.trans.data = np.array([])
-        self.trans.clear_input()
+        if self.recording:
+            print("Recording in progress, do not clear data now")
+        else:
+            self.trans.data = np.array([])
+            self.trans.clear_input()
 
     def enable_buttons(self):
         self.read_btn['state'] = tk.NORMAL
         self.start_plot_btn['state'] = tk.NORMAL
         self.stop_plot_btn['state'] = tk.NORMAL
         self.clear_plot_btn['state'] = tk.NORMAL
+
+    def start_stop_recording(self):
+        if self.plotting:
+            if not self.recording:  # then now recording should start
+                self.recording = True
+                self.start_stop_record_btn['text'] = 'Stop recording'
+
+                data = self.trans.read_str_by_str()
+                self.record_start = data.size
+                self.plot = self.axes.plot(np.arrang(data.size), data, color='green')
+            else:  # then now stop recording and write a csv file
+                self.recording = False
+                self.start_stop_record_btn['text'] = 'Start recording'
+
+                data = self.trans.read_str_by_str()
+                self.plot = self.axes.plot(np.arrang(data.size), data, color='blue')
+
+                recorded = self.trans.data[self.record_start:]
+                np.savetxt("chromatogram.csv", recorded, delimiter=';')
+        else:
+            print("Not plotting now, unable to start/stop recording")
 
 
 class ArduinoTransceiver:
@@ -284,4 +318,5 @@ class ReadLine:
 
 if __name__ == '__main__':
     app = App()
+    # app.axes.set_prop_cycle(['green'])
     app.mainloop()
