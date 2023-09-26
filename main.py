@@ -94,7 +94,7 @@ class App(tk.Tk):
         self.start_stop_record_btn = tk.Button(
             button_frame,
             text="Start recording",
-            command=self.clear_data,
+            command=self.start_stop_recording,
             state=tk.DISABLED
         )
         self.start_stop_record_btn.grid(row=1, column=1, sticky=tk.W + tk.E)
@@ -139,7 +139,7 @@ class App(tk.Tk):
 
             self.axes.set_xlim([0, data.size])
             if np.max(data) != np.inf:
-                self.axes.set_ylim([0, np.max(data)] + 1.0)
+                self.axes.set_ylim([0, np.max(data) + 1.0])
 
             self.figure_canvas.draw()
             self.figure_canvas.flush_events()
@@ -148,6 +148,7 @@ class App(tk.Tk):
 
     def stop_update_plot(self) -> None:
         self.plotting = False
+        self.start_stop_record_btn['state'] = tk.DISABLED
 
     def destroy_and_end_plotting(self) -> None:
         self.plotting = False
@@ -166,6 +167,7 @@ class App(tk.Tk):
             print("Your chosen port is None, please chose another")
 
     def start_plotting(self) -> None:
+        self.start_stop_record_btn['state'] = tk.NORMAL
         update_thread = threading.Thread(target=self.start_update_plot())
         update_thread.start()
 
@@ -190,13 +192,13 @@ class App(tk.Tk):
 
                 data = self.trans.read_str_by_str()
                 self.record_start = data.size
-                self.plot = self.axes.plot(np.arrang(data.size), data, color='green')
+                self.plot, = self.axes.plot(np.arange(data.size), data, color='green')
             else:  # then now stop recording and write a csv file
                 self.recording = False
                 self.start_stop_record_btn['text'] = 'Start recording'
 
                 data = self.trans.read_str_by_str()
-                self.plot = self.axes.plot(np.arrang(data.size), data, color='blue')
+                self.plot,  = self.axes.plot(np.arange(data.size), data, color='blue')
 
                 recorded = self.trans.data[self.record_start:]
                 np.savetxt("chromatogram.csv", recorded, delimiter=';')
@@ -245,9 +247,12 @@ class ArduinoTransceiver:
                                 char_count += 1
                         if char_count >= 2:
                             raw_list = np.delete(raw_list, i, axis=0)
-                        float_list = raw_list.astype(float)
+                        try:
+                            float_list = raw_list.astype(float)
+                            self.data = np.append(self.data, float_list)
+                        except:
+                            continue
 
-                        self.data = np.append(self.data, float_list)
             except UnicodeDecodeError as e:
                 print(e)
                 buffer_size = self.realport.in_waiting
