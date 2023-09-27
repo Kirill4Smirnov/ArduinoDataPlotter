@@ -29,6 +29,7 @@ class App(tk.Tk):
         self.variable = tk.StringVar(self)
         self.title('Chromatograph plotter')
 
+
         self.display_plot()
         self.display_buttons()
 
@@ -57,7 +58,7 @@ class App(tk.Tk):
         self.read_btn = tk.Button(
             port_frame,
             text="Read and print buffer",
-            command=self.print_variable,
+            command=self.print_variable_seconds,
             state=tk.DISABLED
         )
         self.read_btn.grid(row=0, column=2)
@@ -125,6 +126,13 @@ class App(tk.Tk):
             return
 
         print(self.trans.read_str_by_str())
+
+    def print_variable_seconds(self) -> None:
+        if self.trans.realport is None:
+            print("Connection is not set up")
+            return
+
+        print(self.trans.read_str_by_str_seconds())
 
     def start_update_plot(self) -> None:
         if self.trans.realport is None:
@@ -294,9 +302,11 @@ class ArduinoTransceiver:
         while self.realport.in_waiting > 20:
             try:
                 val = self.line_reader.readline().decode()
-                raw_list = np.array(re.split(r'\r\n|\n\r', val))
+                raw_list = np.array(re.split(r'\r\n|\n\r| ', val))
                 raw_list = raw_list[raw_list != '']
-                if len(raw_list) > 0:
+
+                print(f"val = {val}, raw_list = {raw_list}")
+                if len(raw_list) > 1:
                     char_count = 0
                     for char in raw_list[1]:
                         if char == '.':
@@ -305,8 +315,13 @@ class ArduinoTransceiver:
                         continue
                     try:
                         float_list = raw_list.astype(float)
-                        self.data_seconds = np.append(self.data_seconds, float_list, axis=0)
-                    except:
+                        float_list = np.array([float_list[0], float_list[1]],
+                                                               dtype=[('x', float), ('y', float)])
+                        #print(float_list)
+                        self.data_seconds = np.append(float_list, self.data_seconds, axis=0)
+
+                    except Exception as e:
+                        print(e)
                         continue
 
             except UnicodeDecodeError as e:
