@@ -29,7 +29,6 @@ class App(tk.Tk):
         self.variable = tk.StringVar(self)
         self.title('Chromatograph plotter')
 
-
         self.display_plot()
         self.display_buttons()
 
@@ -80,7 +79,7 @@ class App(tk.Tk):
         self.start_plot_btn = tk.Button(
             button_frame,
             text="Start plotting",
-            command=self.start_plotting,
+            command=self.start_plotting_seconds,
             state=tk.DISABLED
         )
         self.start_plot_btn.grid(row=0, column=0, sticky=tk.W + tk.E)
@@ -165,15 +164,16 @@ class App(tk.Tk):
         self.plotting = True
         while self.plotting == True:
             data = self.trans.read_str_by_str_seconds()
-            # print(data)
-            self.plot.set_ydata(data)
-            self.plot.set_xdata(np.arange(data.size))
-
-            self.axes.set_xlim([0, data.size])
-            if data.size == 0:
+            # print(data['x'])
+            if len(data['x']) == 0:
                 continue
-            if np.max(data) != np.inf:
-                self.axes.set_ylim([0, np.max(data) + 1.0])
+
+            self.plot.set_ydata(data['y'])
+            self.plot.set_xdata(data['x'])
+
+            self.axes.set_xlim([0, data['x'][-1]])
+            if np.max(data['y']) != np.inf:
+                self.axes.set_ylim([0, np.max(data['y']) + 1.0])
 
             self.figure_canvas.draw()
             self.figure_canvas.flush_events()
@@ -203,6 +203,11 @@ class App(tk.Tk):
     def start_plotting(self) -> None:
         self.start_stop_record_btn['state'] = tk.NORMAL
         update_thread = threading.Thread(target=self.start_update_plot())
+        update_thread.start()
+
+    def start_plotting_seconds(self) -> None:
+        self.start_stop_record_btn['state'] = tk.NORMAL
+        update_thread = threading.Thread(target=self.start_update_plot_seconds())
         update_thread.start()
 
     def clear_data(self) -> None:
@@ -305,7 +310,7 @@ class ArduinoTransceiver:
                 raw_list = np.array(re.split(r'\r\n|\n\r| ', val))
                 raw_list = raw_list[raw_list != '']
 
-                print(f"val = {val}, raw_list = {raw_list}")
+                # print(f"val = {val}, raw_list = {raw_list}")
                 if len(raw_list) > 1:
                     char_count = 0
                     for char in raw_list[1]:
@@ -315,11 +320,11 @@ class ArduinoTransceiver:
                         continue
                     try:
                         float_list = raw_list.astype(float)
-                        float_list = np.array([float_list[0], float_list[1]],
-                                                               dtype=[('x', float), ('y', float)])
-                        #print(float_list)
-                        self.data_seconds = np.append(float_list, self.data_seconds, axis=0)
-
+                        float_list = np.array((float_list[0], float_list[1]),
+                                              dtype=[('x', float), ('y', float)])
+                        #print("float_list:  ", float_list)
+                        self.data_seconds = np.append(self.data_seconds, float_list)
+                        #print()
                     except Exception as e:
                         print(e)
                         continue
