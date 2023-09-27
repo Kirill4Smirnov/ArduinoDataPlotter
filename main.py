@@ -95,7 +95,7 @@ class App(tk.Tk):
         self.start_stop_record_btn = tk.Button(
             button_frame,
             text="Start recording",
-            command=self.start_stop_recording,
+            command=self.start_stop_recording_seconds,
             state=tk.DISABLED
         )
         self.start_stop_record_btn.grid(row=1, column=1, sticky=tk.W + tk.E)
@@ -171,7 +171,7 @@ class App(tk.Tk):
             self.plot.set_ydata(data['y'])
             self.plot.set_xdata(data['x'])
 
-            self.axes.set_xlim([0, data['x'][-1]])
+            self.axes.set_xlim([data['x'][0], data['x'][-1]])
             if np.max(data['y']) != np.inf:
                 self.axes.set_ylim([0, np.max(data['y']) + 1.0])
 
@@ -240,7 +240,30 @@ class App(tk.Tk):
                 self.axes.cla()
                 self.plot, = self.axes.plot(np.arange(data.size), data, color='blue')
 
-                recorded = self.trans.data[self.record_start:]
+                recorded = data[self.record_start:]
+                np.savetxt("chromatogram.csv", recorded, delimiter=';')
+        else:
+            print("Not plotting now, unable to start/stop recording")
+
+    def start_stop_recording_seconds(self):
+        if self.plotting:
+            if not self.recording:  # then now recording should start
+                self.recording = True
+                self.start_stop_record_btn['text'] = 'Stop recording'
+
+                data = self.trans.read_str_by_str_seconds()
+                self.record_start = data['x'].size
+                self.plot, = self.axes.plot(data['x'], data['y'], color='green')
+            else:  # then now stop recording and write a csv file
+                self.recording = False
+                self.start_stop_record_btn['text'] = 'Start recording'
+
+                data = self.trans.read_str_by_str_seconds()
+                self.axes.cla()
+                self.plot, = self.axes.plot(data['x'], data['y'], color='blue')
+
+                recorded = data[self.record_start:-1]
+                #print(f"recorded: {recorded}, \n data: {data}")
                 np.savetxt("chromatogram.csv", recorded, delimiter=';')
         else:
             print("Not plotting now, unable to start/stop recording")
@@ -322,9 +345,9 @@ class ArduinoTransceiver:
                         float_list = raw_list.astype(float)
                         float_list = np.array((float_list[0], float_list[1]),
                                               dtype=[('x', float), ('y', float)])
-                        #print("float_list:  ", float_list)
+                        # print("float_list:  ", float_list)
                         self.data_seconds = np.append(self.data_seconds, float_list)
-                        #print()
+                        # print()
                     except Exception as e:
                         print(e)
                         continue
