@@ -36,6 +36,7 @@ class App(tk.Tk):
         self.variable = tk.StringVar(self)
         self.variable.set('None')  # default value
 
+        time.sleep(0.1)
         ports = self.trans.list_available_serial_ports()
 
         port_frame = tk.Frame(self)
@@ -138,6 +139,31 @@ class App(tk.Tk):
             self.plot.set_xdata(np.arange(data.size))
 
             self.axes.set_xlim([0, data.size])
+            if data.size == 0:
+                continue
+            if np.max(data) != np.inf:
+                self.axes.set_ylim([0, np.max(data) + 1.0])
+
+            self.figure_canvas.draw()
+            self.figure_canvas.flush_events()
+            # matplotlib.pyplot.show()
+            time.sleep(0.05)
+
+    def start_update_plot_seconds(self) -> None:
+        if self.trans.realport is None:
+            print("Connection is not set up")
+            return
+
+        self.plotting = True
+        while self.plotting == True:
+            data = self.trans.read_str_by_str_seconds()
+            # print(data)
+            self.plot.set_ydata(data)
+            self.plot.set_xdata(np.arange(data.size))
+
+            self.axes.set_xlim([0, data.size])
+            if data.size == 0:
+                continue
             if np.max(data) != np.inf:
                 self.axes.set_ylim([0, np.max(data) + 1.0])
 
@@ -198,7 +224,8 @@ class App(tk.Tk):
                 self.start_stop_record_btn['text'] = 'Start recording'
 
                 data = self.trans.read_str_by_str()
-                self.plot,  = self.axes.plot(np.arange(data.size), data, color='blue')
+                self.axes.cla()
+                self.plot, = self.axes.plot(np.arange(data.size), data, color='blue')
 
                 recorded = self.trans.data[self.record_start:]
                 np.savetxt("chromatogram.csv", recorded, delimiter=';')
@@ -210,6 +237,7 @@ class ArduinoTransceiver:
     def __init__(self):
         self.i = 0
         self.data = np.array([])
+        self.data_seconds = np.array([], dtype=[('x', float), ('y', float)])
         self.realport = None
 
     def connect(self, port):
@@ -262,11 +290,40 @@ class ArduinoTransceiver:
 
         return self.data.copy()
 
+    def read_str_by_str_seconds(self):
+        while self.realport.in_waiting > 20:
+            try:
+                val = self.line_reader.readline().decode()
+                raw_list = np.array(re.split(r'\r\n|\n\r', val))
+                raw_list = raw_list[raw_list != '']
+                if len(raw_list) > 0:
+                    char_count = 0
+                    for char in raw_list[1]:
+                        if char == '.':
+                            char_count += 1
+                    if char_count >= 2:
+                        continue
+                    try:
+                        float_list = raw_list.astype(float)
+                        self.data_seconds = np.append(self.data_seconds, float_list, axis=0)
+                    except:
+                        continue
+
+            except UnicodeDecodeError as e:
+                print(e)
+                buffer_size = self.realport.in_waiting
+                self.realport.read(buffer_size)
+                # self.realport.flush()
+                continue
+
+        return self.data_seconds.copy()
+
     def clear_input(self):
         buffer_size = self.realport.in_waiting
         self.realport.read(buffer_size)
 
         self.data = np.array([])
+        self.data_seconds = np.array([], dtype=[('x', float), ('y', float)])
 
     @staticmethod
     def list_available_serial_ports():
